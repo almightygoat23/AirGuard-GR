@@ -788,6 +788,26 @@
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
   }
 
+  /** Καθαρίζει τελείως την τοποθεσία: μνήμη, κατάσταση και οθόνη.
+   *  Η προτίμηση ακτίνας διατηρείται, γιατί δεν είναι τοποθεσία. */
+  function clearHome() {
+    state.home = null;
+    state.airports = [];
+    state.selected = null;
+    state.hours = [];
+    state.fetchedAt = 0;
+    save();                       // αποθηκεύει home: null, κρατά το radiusKm
+    $("placeName").textContent = "Χωρίς τοποθεσία";
+    $("updated").textContent = "";
+    $("q").value = "";
+    $("results").innerHTML = "";
+    $("searchMsg").textContent = "";
+    $("streetHint").classList.add("hidden");
+    var dial = $("dial");
+    while (dial.firstChild) dial.removeChild(dial.firstChild);
+    $("dialTitle").textContent = "";
+  }
+
   function setHome(home) {
     state.home = home;
     state.selected = null;
@@ -810,10 +830,9 @@
   $("btnGps").addEventListener("click", useGps);
   $("btnRefresh").addEventListener("click", refresh);
   $("btnChange").addEventListener("click", function () {
-    $("q").value = "";
-    $("results").innerHTML = "";
-    $("streetHint").classList.add("hidden");
+    clearHome();
     showSetup();
+    $("q").focus();
   });
   Array.prototype.forEach.call($("radius").children, function (b) {
     b.addEventListener("click", function () {
