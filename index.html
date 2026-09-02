@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AirGuard GR</title>
+<meta name="description" content="Δείχνει αν ο άνεμος μεταφέρει αέρα από κοντινό αεροδρόμιο προς την κατοικία σας και πότε είναι καλύτερη ώρα για αερισμό.">
+<meta name="theme-color" content="#14202b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AirGuard GR">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+  :root{
+    --bg:#14202b;
+    --panel:#1c2c3a;
+    --panel-2:#233748;
+    --line:#2f4759;
+    --ink:#e7eef3;
+    --muted:#93a9b9;
+    --radar:#4a7d9e;
+    --low:#3fa07f;
+    --mod:#d9a136;
+    --high:#d4574f;
+    --focus:#8ecbe8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px;
+    line-height:1.5;
+    -webkit-text-size-adjust:100%;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:14px 16px 40px}
+  h1{font-size:15px;font-weight:600;letter-spacing:.01em;margin:0}
+  h2{font-size:15px;font-weight:600;margin:0 0 8px}
+  p{margin:0 0 10px}
+  a{color:var(--focus)}
+  button{font:inherit;color:inherit;cursor:pointer}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px}
+  .place{font-size:13px;color:var(--muted);margin-top:2px}
+  .iconbtn{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:13px;color:var(--muted)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--radar)}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+
+  /* --- ραντάρ --- */
+  .dial{display:block;width:100%;height:auto;max-width:340px;margin:0 auto}
+  .dial text{font-family:inherit}
+
+  /* --- ετυμηγορία --- */
+  .verdict{margin:2px 0 14px}
+  .flag{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  .lvl-low .dot{background:var(--low)}
+  .lvl-moderate .dot{background:var(--mod)}
+  .lvl-high .dot{background:var(--high)}
+  .verdict h2{font-size:21px;line-height:1.25;letter-spacing:-.01em;margin-bottom:6px}
+  .verdict p{color:var(--muted);font-size:14px;margin:0}
+
+  /* --- μετρήσεις --- */
+  .readings{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border-radius:10px;overflow:hidden}
+  .readings div{background:var(--panel-2);padding:10px 12px}
+  .readings dt{font-size:12px;color:var(--muted);margin-bottom:2px}
+  .readings dd{margin:0;font-size:17px}
+  @media (min-width:420px){.readings{grid-template-columns:repeat(4,1fr)}}
+
+  /* --- 24ωρη λωρίδα --- */
+  .strip{display:flex;gap:3px;align-items:flex-end;height:78px;margin:6px 0 8px}
+  .hr{flex:1;background:none;border:0;padding:0;display:flex;flex-direction:column;justify-content:flex-end;height:100%;border-radius:3px}
+  .hr span{display:block;border-radius:3px 3px 0 0;min-height:3px;background:var(--radar)}
+  .hr.low span{background:var(--low)}
+  .hr.moderate span{background:var(--mod)}
+  .hr.high span{background:var(--high)}
+  .hr[aria-pressed="true"]{box-shadow:0 0 0 1px var(--focus);background:rgba(142,203,232,.10)}
+  .hr.now span{outline:1px solid var(--ink);outline-offset:-1px}
+  .striplabels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+  .windows{font-size:14px;color:var(--muted);margin:10px 0 0}
+  .windows strong{color:var(--ink);font-weight:600}
+
+  /* --- λίστα αεροδρομίων --- */
+  .aplist{list-style:none;margin:0;padding:0}
+  .aplist li{border-top:1px solid var(--line)}
+  .aplist li:first-child{border-top:0}
+  .apbtn{width:100%;background:none;border:0;padding:11px 0;display:flex;align-items:center;gap:10px;text-align:left}
+  .apbtn .nm{flex:1;min-width:0}
+  .apbtn .nm b{display:block;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .apbtn .nm small{color:var(--muted);font-size:12px}
+  .apbtn .sc{font-size:15px;color:var(--muted)}
+  .apbtn[aria-pressed="true"] .nm b{color:var(--focus)}
+
+  /* --- setup --- */
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type=text],input[type=search]{
+    width:100%;padding:11px 12px;font:inherit;color:var(--ink);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px
+  }
+  .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .btn{background:var(--radar);border:0;border-radius:10px;padding:11px 15px;font-weight:600;color:#0d1620}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--ink);font-weight:500}
+  .results{list-style:none;margin:10px 0 0;padding:0}
+  .results li{border-top:1px solid var(--line)}
+  .results button{width:100%;background:none;border:0;padding:11px 0;text-align:left}
+  .results small{display:block;color:var(--muted);font-size:12px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{background:none;border:0;padding:8px 13px;color:var(--muted)}
+  .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--ink)}
+  .note{font-size:13px;color:var(--muted)}
+  .err{color:var(--mod);font-size:14px}
+  .hidden{display:none!important}
+  footer{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6}
+  @media (prefers-reduced-motion:no-preference){
+    .fade{animation:fade .35s ease-out both}
+    @keyframes fade{from{opacity:0}to{opacity:1}}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>AirGuard GR</h1>
+      <div class="place" id="placeName">Χωρίς τοποθεσία</div>
+    </div>
+    <button class="iconbtn hidden" id="btnRefresh" type="button">Ανανέωση</button>
+  </header>
+
+  <!-- ΟΘΟΝΗ 1: ρύθμιση κατοικίας -->
+  <section class="card" id="setup">
+    <h2>Πού είναι η κατοικία σας;</h2>
+    <p class="note">Χρειάζεται μία φορά. Αποθηκεύεται μόνο στη συσκευή σας — δεν φεύγει πουθενά.</p>
+    <label for="q">Δήμος, περιοχή ή συντεταγμένες</label>
+    <input type="search" id="q" placeholder="π.χ. Ασπρόπυργος ή 38.061, 23.594" autocomplete="off" enterkeyhint="search">
+    <div class="row">
+      <button class="btn" id="btnSearch" type="button">Αναζήτηση</button>
+      <button class="btn ghost" id="btnGps" type="button">Χρήση GPS</button>
+    </div>
+    <div id="searchMsg" class="err" role="status" aria-live="polite"></div>
+    <ul class="results" id="results"></ul>
+  </section>
+
+  <!-- ΟΘΟΝΗ 2: αποτελέσματα -->
+  <div id="main" class="hidden">
+
+    <section class="card" id="dialCard">
+      <svg class="dial" id="dial" viewBox="0 0 300 300" role="img" aria-labelledby="dialTitle"></svg>
+      <div id="dialTitle" class="note" style="text-align:center"></div>
+    </section>
+
+    <section class="card">
+      <div class="verdict" id="verdict"></div>
+      <dl class="readings" id="readings"></dl>
+    </section>
+
+    <section class="card" id="stripCard">
+      <h2>Επόμενες 24 ώρες</h2>
+      <div class="strip" id="strip" role="group" aria-label="Δείκτης έκθεσης ανά ώρα"></div>
+      <div class="striplabels" id="stripLabels"></div>
+      <p class="windows" id="windows"></p>
+    </section>
+
+    <section class="card" id="apCard">
+      <h2 id="apHead">Αεροδρόμια κοντά σας</h2>
+      <ul class="aplist" id="aplist"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Ρυθμίσεις</h2>
+      <label for="radius" id="radiusLabel">Ακτίνα αναζήτησης</label>
+      <div class="seg" id="radius" role="group" aria-labelledby="radiusLabel">
+        <button type="button" data-km="10">10 km</button>
+        <button type="button" data-km="15">15 km</button>
+        <button type="button" data-km="20">20 km</button>
+        <button type="button" data-km="30">30 km</button>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="btnChange" type="button">Αλλαγή τοποθεσίας</button>
+      </div>
+    </section>
+
+    <footer>
+      <p>Οι ενδείξεις δείχνουν <strong>μετεωρολογική πιθανότητα μεταφοράς αέρα</strong> από το αεροδρόμιο προς την κατοικία, σε συνδυασμό με τη μοντελοποιημένη ποιότητα αέρα της περιοχής. Δεν αποτελούν μέτρηση ρύπων στο σπίτι σας και δεν λαμβάνουν υπόψη την κίνηση των πτήσεων, το ανάγλυφο ή την ατμοσφαιρική ευστάθεια.</p>
+      <p>Καιρός και ποιότητα αέρα: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (ECMWF / CAMS). Συντεταγμένες αεροδρομίων: δημόσια στοιχεία HCAA/Wikipedia.</p>
+    </footer>
+  </div>
+</div>
+
+<script src="core.js"></script>
+<script src="airports.js"></script>
+<script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
