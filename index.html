@@ -116,6 +116,19 @@
   .seg button{background:none;border:0;padding:8px 13px;color:var(--muted)}
   .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--ink)}
   .note{font-size:13px;color:var(--muted)}
+  .lede{font-size:15px;line-height:1.55;margin:0 0 12px}
+  .lede b{font-weight:600}
+  details{border-top:1px solid var(--line);margin-top:12px}
+  details summary{cursor:pointer;padding:11px 0;font-size:14px;color:var(--focus);list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::after{content:" ›";float:right;color:var(--muted)}
+  details[open] summary::after{content:" ⌄"}
+  details .body{font-size:13.5px;color:var(--muted);line-height:1.6;padding-bottom:6px}
+  details .body p{margin:0 0 9px}
+  details .body strong{color:var(--ink);font-weight:600}
+  .legend{list-style:none;margin:0 0 9px;padding:0}
+  .legend li{display:flex;gap:9px;align-items:flex-start;margin-bottom:6px}
+  .legend .sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto;margin-top:4px}
   .err{color:var(--mod);font-size:14px}
   .hidden{display:none!important}
   footer{font-size:12px;color:var(--muted);margin-top:18px;line-height:1.6}
@@ -132,11 +145,44 @@
     <div>
       <h1>AirGuard GR</h1>
       <div class="place" id="placeName">Χωρίς τοποθεσία</div>
+      <div class="place" id="updated"></div>
     </div>
     <button class="iconbtn hidden" id="btnRefresh" type="button">Ανανέωση</button>
   </header>
 
   <!-- ΟΘΟΝΗ 1: ρύθμιση κατοικίας -->
+  <section class="card" id="intro">
+    <p class="lede">Η εφαρμογή συνδυάζει την <b>πρόγνωση ανέμου</b> με τη θέση των αεροδρομίων της
+      Ελλάδας και σου λέει, ώρα προς ώρα, <b>αν ο αέρας ταξιδεύει από το αεροδρόμιο προς το σπίτι
+      σου</b> — ώστε να ξέρεις πότε αξίζει να ανοίξεις τα παράθυρα και πότε καλύτερα όχι.</p>
+    <p class="note">Στη μετεωρολογία η «διεύθυνση ανέμου» δηλώνει από πού <em>έρχεται</em> ο άνεμος.
+      Η εφαρμογή κάνει αυτή τη μετατροπή για σένα: τα βέλη στο γράφημα δείχνουν προς πού ταξιδεύει
+      ο αέρας.</p>
+
+    <details>
+      <summary>Πόσο έγκυρο είναι αυτό που βλέπεις</summary>
+      <div class="body">
+        <p><strong>Είναι εκτίμηση, όχι μέτρηση.</strong> Δεν υπάρχει αισθητήρας στο σπίτι σου. Η
+          εφαρμογή υπολογίζει γεωμετρικά αν ο άνεμος περνά πάνω από το αεροδρόμιο πριν φτάσει σε
+          σένα, και το συνδυάζει με τη μοντελοποιημένη ποιότητα αέρα της περιοχής.</p>
+        <p><strong>Οι πηγές είναι μοντέλα με πλέγμα 7–11 km.</strong> Ο άνεμος έρχεται από ECMWF και
+          ICON (μέσω Open-Meteo), η ποιότητα αέρα από το ευρωπαϊκό CAMS. Ένα κελί πλέγματος 10 km
+          είναι μεγαλύτερο από ολόκληρα τα Σπάτα, οπότε τοπικά φαινόμενα — θαλάσσια αύρα, ρέματα,
+          λόφοι — δεν αποτυπώνονται. Κάθε τιμή είναι μέσος όρος της ώρας, όχι στιγμιαία.</p>
+        <p><strong>Τι δεν λαμβάνεται υπόψη:</strong> η πραγματική κίνηση των πτήσεων ανά ώρα, η φορά
+          λειτουργίας των διαδρόμων (αλλάζει πού πέφτει το καυσαέριο της απογείωσης), οι
+          θερμοκρασιακές αναστροφές που εγκλωβίζουν τους ρύπους τη νύχτα, το ανάγλυφο, και άλλες
+          πηγές εκπομπών όπως οδικοί άξονες, λιμάνια ή βιομηχανία.</p>
+        <p><strong>Ο χρόνος μετράει.</strong> Οι πρώτες 24 ώρες της πρόγνωσης είναι οι πιο
+          αξιόπιστες. Πιο μακριά, η διεύθυνση του ανέμου αλλάζει συχνά στις προγνώσεις.</p>
+        <p><strong>Πού δεν στέκει.</strong> Δεν είναι ιατρική συμβουλή, ούτε αποδεικτικό στοιχείο.
+          Για επίσημη τεκμηρίωση ή καταγγελία χρειάζονται πιστοποιημένες μετρήσεις ρύπων και
+          θορύβου, όχι πρόγνωση. Χρησιμεύει για να ξέρεις πότε να ανοίξεις το παράθυρο και για να
+          δεις μοτίβα στον χρόνο.</p>
+      </div>
+    </details>
+  </section>
+
   <section class="card" id="setup">
     <h2>Πού είναι η κατοικία σας;</h2>
     <p class="note">Γράψε και βγαίνουν προτάσεις. Αποθηκεύεται μόνο στη συσκευή σου.</p>
@@ -193,8 +239,30 @@
       </div>
     </section>
 
+    <section class="card" id="helpCard">
+      <details>
+        <summary>Πώς να διαβάσεις το γράφημα και τον δείκτη</summary>
+        <div class="body">
+          <ul class="legend">
+            <li><span class="sw" style="background:#3fa07f"></span><span><strong>0–29 · χαμηλή</strong> — ο άνεμος δεν φέρνει αέρα από το αεροδρόμιο. Καλή ώρα για αερισμό.</span></li>
+            <li><span class="sw" style="background:#d9a136"></span><span><strong>30–59 · μέτρια</strong> — έρχεται από εκείνη την κατεύθυνση, αλλά η γωνία, η άπνοια ή η απόσταση περιορίζουν τη μεταφορά.</span></li>
+            <li><span class="sw" style="background:#d4574f"></span><span><strong>60–100 · αυξημένη</strong> — οι συνθήκες ευνοούν έντονα τη μεταφορά αέρα προς εσένα.</span></li>
+          </ul>
+          <p>Στο γράφημα: τα <strong>γκρίζα βέλη</strong> δείχνουν προς πού ταξιδεύει ο αέρας, η
+            <strong>σκιασμένη ζώνη</strong> τον αέρα που φεύγει από το αεροδρόμιο, και ο
+            <strong>διάστικτος κύκλος</strong> το αποτύπωμα του αεροδρομίου — δεν είναι σημείο, έχει
+            έκταση χιλιομέτρων.</p>
+          <p>Στη λωρίδα των 24 ωρών <strong>πάτα οποιαδήποτε ώρα</strong> για να δεις την πρόγνωση
+            εκείνης της στιγμής. Το ύψος κάθε μπάρας είναι ο δείκτης.</p>
+          <p>Ο δείκτης είναι <strong>εκτίμηση από μοντέλα πρόγνωσης, όχι μέτρηση</strong> στο σπίτι
+            σου. Δεν περιλαμβάνει την κίνηση των πτήσεων, τη φορά των διαδρόμων, τις
+            θερμοκρασιακές αναστροφές, το ανάγλυφο ή άλλες πηγές ρύπων. Οι πρώτες 24 ώρες είναι οι
+            πιο αξιόπιστες. Δεν είναι ιατρική συμβουλή ούτε αποδεικτικό στοιχείο για καταγγελία.</p>
+        </div>
+      </details>
+    </section>
+
     <footer>
-      <p>Οι ενδείξεις δείχνουν <strong>μετεωρολογική πιθανότητα μεταφοράς αέρα</strong> από το αεροδρόμιο προς την κατοικία, σε συνδυασμό με τη μοντελοποιημένη ποιότητα αέρα της περιοχής. Δεν αποτελούν μέτρηση ρύπων στο σπίτι σας και δεν λαμβάνουν υπόψη την κίνηση των πτήσεων, το ανάγλυφο ή την ατμοσφαιρική ευστάθεια.</p>
       <p>Καιρός και ποιότητα αέρα: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (ECMWF / CAMS). Αναζήτηση διευθύνσεων: <a href="https://photon.komoot.io/" target="_blank" rel="noopener">Photon</a> και <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener">Nominatim</a>, με δεδομένα <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>. Συντεταγμένες αεροδρομίων: δημόσια στοιχεία HCAA/Wikipedia.</p>
     </footer>
   </div>

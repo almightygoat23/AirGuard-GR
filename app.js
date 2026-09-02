@@ -174,123 +174,204 @@
     state.selected = best ? best.key : null;
   }
 
-  /* ---------- ραντάρ ---------- */
+  /* ---------- σκηνή: σπίτι, αεροδρόμιο, ροή αέρα ---------- */
   var SVG_NS = "http://www.w3.org/2000/svg";
+  var COLORS = { low: "#3fa07f", moderate: "#d9a136", high: "#d4574f" };
+
   function el(name, attrs, text) {
     var n = document.createElementNS(SVG_NS, name);
     for (var k in attrs) n.setAttribute(k, attrs[k]);
     if (text != null) n.textContent = text;
     return n;
   }
-  function pt(cx, cy, r, deg) {
+  /** Μοίρες αζιμουθίου -> μοναδιαίο διάνυσμα σε συντεταγμένες οθόνης (y προς τα κάτω). */
+  function dirVec(deg) {
     var a = (deg * Math.PI) / 180;
-    return [cx + r * Math.sin(a), cy - r * Math.cos(a)];
-  }
-  function wedge(cx, cy, r, from, to, fill) {
-    var p1 = pt(cx, cy, r, from), p2 = pt(cx, cy, r, to);
-    var d = "M" + cx + " " + cy + " L" + p1[0].toFixed(2) + " " + p1[1].toFixed(2) +
-            " A" + r + " " + r + " 0 0 1 " + p2[0].toFixed(2) + " " + p2[1].toFixed(2) + " Z";
-    return el("path", { d: d, fill: fill });
+    return [Math.sin(a), -Math.cos(a)];
   }
 
-  function drawDial() {
+  function drawScene() {
     var svg = $("dial");
     while (svg.firstChild) svg.removeChild(svg.firstChild);
-    var cx = 150, cy = 150, R = 118;
-    var ap = selectedAirport();
     var h = state.hours[state.viewIdx];
+    if (!state.home || !h) return;
+
+    var W = 320, H = 250, cx = 160, cy = 120;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    var ap = selectedAirport();
     var exp = ap ? exposureFor(ap, state.viewIdx) : null;
-    var lvlColor = exp ? ({ low: "#3fa07f", moderate: "#d9a136", high: "#d4574f" })[exp.level] : "#4a7d9e";
+    var lvl = exp ? COLORS[exp.level] : "#4a7d9e";
 
-    // Δακτύλιοι απόστασης. Η κλίμακα είναι τετραγωνική ρίζα, ώστε τα πολύ κοντινά
-    // αεροδρόμια να μην στοιβάζονται πάνω στο κέντρο. Κάθε δακτύλιος γράφει τα km του.
-    [0.2, 0.5, 1].forEach(function (f, i) {
-      var r = R * Math.sqrt(f);
-      svg.appendChild(el("circle", {
-        cx: cx, cy: cy, r: r, fill: "none",
-        stroke: "#2f4759", "stroke-width": i === 2 ? 1.5 : 1
-      }));
-      var km = state.radiusKm * f;
-      var q = pt(cx, cy, r, 138);
-      svg.appendChild(el("text", {
-        x: q[0] + 4, y: q[1], fill: "#6b8496", "font-size": "10", "text-anchor": "start"
-      }, (km % 1 ? km.toFixed(1) : km) + " km"));
-    });
-
-    // Κώνος από όπου έρχεται ο αέρας. Το άνοιγμα είναι αυτό που χρησιμοποιεί και ο
-    // υπολογισμός, ώστε η εικόνα να συμφωνεί με τον δείκτη.
-    if (h) {
-      var span = exp ? exp.spanHalf : 0;
-      svg.appendChild(wedge(cx, cy, R, h.windDir - 35 - span, h.windDir + 35 + span, "rgba(74,125,158,.16)"));
-      svg.appendChild(wedge(cx, cy, R, h.windDir - 12 - span, h.windDir + 12 + span, "rgba(74,125,158,.34)"));
+    // --- προβολή: χιλιόμετρα γύρω από το σπίτι, βορράς πάνω ---
+    var kx = Math.cos((state.home.lat * Math.PI) / 180) * 111.32, ky = 110.574;
+    function toKm(o) {
+      return [(o.lon - state.home.lon) * kx, (o.lat - state.home.lat) * ky];
     }
-
-    // σημεία ορίζοντα
-    [["Β", 0], ["Α", 90], ["Ν", 180], ["Δ", 270]].forEach(function (p) {
-      var q = pt(cx, cy, R + 17, p[1]);
-      svg.appendChild(el("text", {
-        x: q[0], y: q[1] + 4, fill: "#93a9b9", "font-size": "12",
-        "text-anchor": "middle"
-      }, p[0]));
+    var minX = -0.8, maxX = 0.8, minY = -0.8, maxY = 0.8;   // το σπίτι στο (0,0)
+    state.airports.forEach(function (a) {
+      var k = toKm(a.ref), ext = extentOf(a.ref) + 0.6;
+      minX = Math.min(minX, k[0] - ext); maxX = Math.max(maxX, k[0] + ext);
+      minY = Math.min(minY, k[1] - ext); maxY = Math.max(maxY, k[1] + ext);
     });
-
-    // βέλος ανέμου: έρχεται από την περιφέρεια προς το κέντρο
-    if (h) {
-      var tail = pt(cx, cy, R - 6, h.windDir);
-      var head = pt(cx, cy, 19, h.windDir);
-      svg.appendChild(el("line", {
-        x1: tail[0], y1: tail[1], x2: head[0], y2: head[1],
-        stroke: lvlColor, "stroke-width": 2.5, "stroke-linecap": "round"
-      }));
-      var b1 = pt(cx, cy, 34, h.windDir - 7), b2 = pt(cx, cy, 34, h.windDir + 7);
-      svg.appendChild(el("path", {
-        d: "M" + head[0].toFixed(1) + " " + head[1].toFixed(1) +
-           " L" + b1[0].toFixed(1) + " " + b1[1].toFixed(1) +
-           " L" + b2[0].toFixed(1) + " " + b2[1].toFixed(1) + " Z",
-        fill: lvlColor
-      }));
+    var padX = 46, padY = 40;
+    var scale = Math.min((W - 2 * padX) / (maxX - minX), (H - 2 * padY) / (maxY - minY));
+    var midX = (minX + maxX) / 2, midY = (minY + maxY) / 2;
+    function xy(o) {
+      var k = toKm(o);
+      return [W / 2 + (k[0] - midX) * scale, H / 2 - (k[1] - midY) * scale];
     }
+    function inside(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    var home = xy({ lat: state.home.lat, lon: state.home.lon });
+    cx = home[0]; cy = home[1];
 
-    // αεροδρόμια
-    for (var i = 0; i < state.airports.length; i++) {
-      var a = state.airports[i];
-      var rr = Math.max(22, Math.min(R - 4, R * Math.sqrt(a.distanceKm / state.radiusKm)));
-      var p = pt(cx, cy, rr, a.bearing);
-      var isSel = ap && a.key === ap.key;
-      var half = C.footprintHalfAngle(a.distanceKm, extentOf(a.ref));
-      if (isSel && half > 6 && half < 90) {
-        // το αεροδρόμιο δεν είναι σημείο: τόξο με το πραγματικό γωνιακό του πλάτος
-        var e1 = pt(cx, cy, rr, a.bearing - half), e2 = pt(cx, cy, rr, a.bearing + half);
-        svg.appendChild(el("path", {
-          d: "M" + e1[0].toFixed(1) + " " + e1[1].toFixed(1) + " A" + rr.toFixed(1) + " " +
-             rr.toFixed(1) + " 0 0 1 " + e2[0].toFixed(1) + " " + e2[1].toFixed(1),
-          fill: "none", stroke: lvlColor, "stroke-width": 7, "stroke-linecap": "round", opacity: ".85"
+    var defs = el("defs");
+    var clip = el("clipPath", { id: "frame" });
+    clip.appendChild(el("rect", { x: 0, y: 0, width: W, height: H, rx: 10 }));
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+
+    var g = el("g", { "clip-path": "url(#frame)" });
+    svg.appendChild(g);
+
+    // --- ροή αέρα: παράλληλα βέλη προς τη φορά που ταξιδεύει ο αέρας ---
+    var travel = (h.windDir + 180) % 360;          // ο άνεμος πνέει ΑΠΟ h.windDir
+    var d = dirVec(travel), perp = [-d[1], d[0]];
+    var flowing = exp && exp.transport > 0;
+    var arrowCol = "#8fa6b6";        // ο άνεμος είναι πληροφορία, όχι προειδοποίηση
+    for (var i = -4; i <= 4; i++) {
+      var off = i * 42;
+      var mx = cx + perp[0] * off, my = cy + perp[1] * off;
+      var L = 150;
+      var x1 = mx - d[0] * L, y1 = my - d[1] * L;
+      var x2 = mx + d[0] * L, y2 = my + d[1] * L;
+      g.appendChild(el("line", {
+        x1: x1.toFixed(1), y1: y1.toFixed(1), x2: x2.toFixed(1), y2: y2.toFixed(1),
+        stroke: arrowCol, "stroke-width": 1, opacity: ".22"
+      }));
+      // κεφαλές βελών κατά μήκος της γραμμής, ώστε να φαίνεται η φορά
+      for (var t = -0.5; t <= 0.55; t += 0.5) {
+        var hx = mx + d[0] * L * t, hy = my + d[1] * L * t;
+        g.appendChild(el("path", {
+          d: "M" + hx.toFixed(1) + " " + hy.toFixed(1) +
+             " L" + (hx - d[0] * 9 - perp[0] * 4).toFixed(1) + " " + (hy - d[1] * 9 - perp[1] * 4).toFixed(1) +
+             " L" + (hx - d[0] * 9 + perp[0] * 4).toFixed(1) + " " + (hy - d[1] * 9 + perp[1] * 4).toFixed(1) + " Z",
+          fill: arrowCol, opacity: ".45"
         }));
       }
-      svg.appendChild(el("circle", {
-        cx: p[0], cy: p[1], r: isSel ? 7 : 4.5,
-        fill: isSel ? lvlColor : "#233748",
-        stroke: isSel ? "#e7eef3" : "#4a7d9e", "stroke-width": 1.5
+    }
+
+    // --- νέφος από το αεροδρόμιο προς τα υπήνεμα ---
+    if (ap) {
+      var a0 = xy(ap.ref);
+      [[30, ".12"], [13, ".26"]].forEach(function (band) {
+        var half = band[0], op = band[1];
+        var e1 = dirVec(travel - half), e2 = dirVec(travel + half), Lp = 420;
+        g.appendChild(el("path", {
+          d: "M" + a0[0].toFixed(1) + " " + a0[1].toFixed(1) +
+             " L" + (a0[0] + e1[0] * Lp).toFixed(1) + " " + (a0[1] + e1[1] * Lp).toFixed(1) +
+             " L" + (a0[0] + e2[0] * Lp).toFixed(1) + " " + (a0[1] + e2[1] * Lp).toFixed(1) + " Z",
+          fill: flowing ? lvl : "#4a7d9e", opacity: flowing ? op : ".07"
+        }));
+      });
+    }
+
+    // --- αεροδρόμια ---
+    state.airports.forEach(function (a) {
+      var p = xy(a.ref), isSel = ap && a.key === ap.key;
+      var extPx = Math.max(7, extentOf(a.ref) * scale);
+      // αποτύπωμα: γιατί ένα μεγάλο αεροδρόμιο δεν είναι κουκκίδα
+      g.appendChild(el("circle", {
+        cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: extPx.toFixed(1),
+        fill: isSel ? "rgba(212,87,79,.10)" : "none",
+        stroke: isSel ? "#8fa6b6" : "#3c5c73", "stroke-width": 1,
+        "stroke-dasharray": "3 3"
       }));
-      if (isSel) {
-        // η ετικέτα φεύγει έξω από το πλήθος γραμμών του κέντρου
-        var lp = pt(cx, cy, Math.min(R + 2, rr + 19), a.bearing);
-        svg.appendChild(el("text", {
-          x: lp[0], y: lp[1] + 4, fill: "#e7eef3", "font-size": "12", "font-weight": "600",
-          "text-anchor": lp[0] > cx + 16 ? "start" : lp[0] < cx - 16 ? "end" : "middle"
-        }, a.ref.iata || a.ref.icao || "AP"));
+      // διάδρομοι, όταν ξέρουμε τον προσανατολισμό τους
+      if (a.ref.runwayDeg != null && extPx > 12) {
+        var rv = dirVec(a.ref.runwayDeg), rp = [-rv[1], rv[0]];
+        var half = extPx * 0.85;
+        [-1, 1].forEach(function (side) {
+          var ox = p[0] + rp[0] * side * extPx * 0.3, oy = p[1] + rp[1] * side * extPx * 0.3;
+          g.appendChild(el("line", {
+            x1: (ox - rv[0] * half).toFixed(1), y1: (oy - rv[1] * half).toFixed(1),
+            x2: (ox + rv[0] * half).toFixed(1), y2: (oy + rv[1] * half).toFixed(1),
+            stroke: "#c8d6e0", "stroke-width": 2.5, "stroke-linecap": "round", opacity: ".75"
+          }));
+        });
+      }
+      // εικονίδιο αεροπλάνου
+      g.appendChild(el("path", {
+        d: "M0 -7 L1.7 -2 L8 2 L8 3.6 L1.7 2.2 L1.7 5.5 L4 7.4 L4 8.6 L0 7.6 " +
+           "L-4 8.6 L-4 7.4 L-1.7 5.5 L-1.7 2.2 L-8 3.6 L-8 2 L-1.7 -2 Z",
+        transform: "translate(" + p[0].toFixed(1) + "," + p[1].toFixed(1) + ") rotate(" +
+                   ((a.ref.runwayDeg != null ? a.ref.runwayDeg : 0)) + ") scale(" + (isSel ? 1 : 0.7) + ")",
+        fill: isSel ? lvl : "#7d94a5", stroke: "#14202b", "stroke-width": ".8"
+      }));
+      var away = dirVec(a.bearing);                  // από το σπίτι προς το αεροδρόμιο
+      var lp = [p[0] + away[0] * (extPx + 16), p[1] + away[1] * (extPx + 16)];
+      g.appendChild(el("text", {
+        x: inside(lp[0], 30, W - 30).toFixed(1), y: inside(lp[1] + 4, 14, H - 10).toFixed(1),
+        fill: isSel ? "#e7eef3" : "#93a9b9", "font-size": "11",
+        "font-weight": isSel ? "600" : "400",
+        "text-anchor": Math.abs(away[0]) < 0.35 ? "middle" : away[0] > 0 ? "start" : "end"
+      }, a.ref.iata || a.ref.icao || "αεροδρόμιο"));
+    });
+
+    // --- απόσταση σπίτι - αεροδρόμιο ---
+    if (ap) {
+      var pa = xy(ap.ref);
+      g.appendChild(el("line", {
+        x1: cx, y1: cy, x2: pa[0].toFixed(1), y2: pa[1].toFixed(1),
+        stroke: "#8fa6b6", "stroke-width": 1, "stroke-dasharray": "2 4", opacity: ".7"
+      }));
+      var pxDist = Math.sqrt(Math.pow(pa[0] - cx, 2) + Math.pow(pa[1] - cy, 2));
+      if (pxDist > 48) {
+        var av = dirVec(ap.bearing), ap2 = [-av[1], av[0]];
+        var mx2 = (cx + pa[0]) / 2 + ap2[0] * 12, my2 = (cy + pa[1]) / 2 + ap2[1] * 12;
+        g.appendChild(el("text", {
+          x: mx2.toFixed(1), y: (my2 + 3).toFixed(1), fill: "#8fa6b6", "font-size": "10",
+          "text-anchor": "middle"
+        }, ap.distanceKm.toFixed(1) + " km"));
       }
     }
 
-    // κατοικία
-    svg.appendChild(el("circle", { cx: cx, cy: cy, r: 5, fill: "#e7eef3" }));
-    svg.appendChild(el("circle", { cx: cx, cy: cy, r: 11, fill: "none", stroke: "#e7eef3", "stroke-width": 1, opacity: ".45" }));
+    // --- το σπίτι ---
+    if (exp && exp.level === "high") {
+      g.appendChild(el("circle", { cx: cx, cy: cy, r: 17, fill: lvl, opacity: ".18" }));
+    }
+    g.appendChild(el("path", {
+      d: "M-8 0 L0 -8 L8 0 L8 8 L-8 8 Z",
+      transform: "translate(" + cx + "," + cy + ")",
+      fill: "#e7eef3", stroke: "#14202b", "stroke-width": "1"
+    }));
+    var hv = ap ? dirVec(ap.bearing) : [0, -1];      // ετικέτα στην αντίθετη πλευρά
+    var hl = [cx - hv[0] * 26, cy - hv[1] * 26];
+    g.appendChild(el("text", {
+      x: inside(hl[0], 36, W - 36).toFixed(1), y: inside(hl[1] + 4, 14, H - 10).toFixed(1),
+      fill: "#e7eef3", "font-size": "11",
+      "text-anchor": Math.abs(hv[0]) < 0.35 ? "middle" : hv[0] > 0 ? "end" : "start"
+    }, "το σπίτι σου"));
 
-    $("dialTitle").innerHTML = h
-      ? (state.viewIdx === state.nowIdx ? "Τώρα, " : "Πρόβλεψη ") + hhmm(h.time) +
-        " · άνεμος από " + C.compass16(h.windDir) + " (" + Math.round(h.windDir) + "°)" +
-        "<br>Στο κέντρο το σπίτι σας. Η σκιασμένη ζώνη δείχνει από πού έρχεται ο αέρας."
-      : "";
+    // --- πυξίδα ---
+    var nx = 22, ny = H - 40;
+    svg.appendChild(el("line", {
+      x1: nx, y1: ny + 14, x2: nx, y2: ny - 8, stroke: "#8fa6b6", "stroke-width": 1.2
+    }));
+    svg.appendChild(el("path", {
+      d: "M" + nx + " " + (ny - 13) + " L" + (nx - 4) + " " + (ny - 5) + " L" + (nx + 4) + " " + (ny - 5) + " Z",
+      fill: "#8fa6b6"
+    }));
+    svg.appendChild(el("text", {
+      x: nx, y: ny + 25, fill: "#8fa6b6", "font-size": "10", "text-anchor": "middle"
+    }, "Β"));
+
+    $("dialTitle").innerHTML =
+      (state.viewIdx === state.nowIdx ? "Τώρα, " : "Πρόβλεψη ") + hhmm(h.time) +
+      " · άνεμος από " + C.compass16(h.windDir) + " (" + Math.round(h.windDir) + "°), " +
+      Math.round(h.windKmh) + " km/h" +
+      "<br>Τα βέλη δείχνουν προς πού ταξιδεύει ο αέρας" +
+      (ap ? ", και η σκιασμένη ζώνη τον αέρα που φεύγει από το αεροδρόμιο." : ".");
   }
 
   /* ---------- ετυμηγορία & μετρήσεις ---------- */
@@ -488,7 +569,11 @@
   /* ---------- render ---------- */
   function render() {
     $("placeName").textContent = state.home ? state.home.label : "Χωρίς τοποθεσία";
-    drawDial();
+    $("updated").textContent = state.fetchedAt
+      ? "δεδομένα " + new Date(state.fetchedAt).toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" }) +
+        " · πρόγνωση ECMWF/CAMS, όχι μέτρηση"
+      : "";
+    drawScene();
     drawVerdict();
     drawStrip();
     drawAirports();
@@ -498,6 +583,7 @@
   }
 
   function showMain() {
+    $("intro").classList.add("hidden");
     $("setup").classList.add("hidden");
     $("main").classList.remove("hidden");
     $("main").classList.add("fade");
@@ -505,6 +591,7 @@
   }
   function showSetup() {
     $("main").classList.add("hidden");
+    $("intro").classList.remove("hidden");
     $("setup").classList.remove("hidden");
     $("btnRefresh").classList.add("hidden");
   }
