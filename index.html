@@ -111,6 +111,7 @@
   .results li{border-top:1px solid var(--line)}
   .results button{width:100%;background:none;border:0;padding:11px 0;text-align:left}
   .results small{display:block;color:var(--muted);font-size:12px}
+  .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px;white-space:nowrap}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .seg button{background:none;border:0;padding:8px 13px;color:var(--muted)}
   .seg button[aria-pressed="true"]{background:var(--panel-2);color:var(--ink)}
@@ -138,15 +139,19 @@
   <!-- ΟΘΟΝΗ 1: ρύθμιση κατοικίας -->
   <section class="card" id="setup">
     <h2>Πού είναι η κατοικία σας;</h2>
-    <p class="note">Χρειάζεται μία φορά. Αποθηκεύεται μόνο στη συσκευή σας — δεν φεύγει πουθενά.</p>
-    <label for="q">Δήμος, περιοχή ή συντεταγμένες</label>
-    <input type="search" id="q" placeholder="π.χ. Ασπρόπυργος ή 38.061, 23.594" autocomplete="off" enterkeyhint="search">
+    <p class="note">Γράψε και βγαίνουν προτάσεις. Αποθηκεύεται μόνο στη συσκευή σου.</p>
+    <label for="q">Οδός, περιοχή ή συντεταγμένες</label>
+    <input type="search" id="q" placeholder="π.χ. Ανθυποσμηναγού Μπέκα Σπάτα" autocomplete="off" enterkeyhint="search">
     <div class="row">
       <button class="btn" id="btnSearch" type="button">Αναζήτηση</button>
       <button class="btn ghost" id="btnGps" type="button">Χρήση GPS</button>
     </div>
     <div id="searchMsg" class="err" role="status" aria-live="polite"></div>
     <ul class="results" id="results"></ul>
+    <p class="note hidden" id="streetHint">Επιλέχθηκε ολόκληρη η οδός, δηλαδή το μέσο της. Σε μακριές
+      οδούς αυτό μετακινεί τη γωνία προς το αεροδρόμιο κατά μερικές μοίρες. Για ακρίβεια σπιτιού,
+      πρόσθεσε αριθμό (π.χ. «Μπέκα 15 Σπάτα») ή βάλε συντεταγμένες από τους Χάρτες Google:
+      παρατεταμένο πάτημα στο σπίτι σου, αντιγραφή των αριθμών, επικόλληση εδώ.</p>
   </section>
 
   <!-- ΟΘΟΝΗ 2: αποτελέσματα -->
@@ -190,7 +195,7 @@
 
     <footer>
       <p>Οι ενδείξεις δείχνουν <strong>μετεωρολογική πιθανότητα μεταφοράς αέρα</strong> από το αεροδρόμιο προς την κατοικία, σε συνδυασμό με τη μοντελοποιημένη ποιότητα αέρα της περιοχής. Δεν αποτελούν μέτρηση ρύπων στο σπίτι σας και δεν λαμβάνουν υπόψη την κίνηση των πτήσεων, το ανάγλυφο ή την ατμοσφαιρική ευστάθεια.</p>
-      <p>Καιρός και ποιότητα αέρα: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (ECMWF / CAMS). Συντεταγμένες αεροδρομίων: δημόσια στοιχεία HCAA/Wikipedia.</p>
+      <p>Καιρός και ποιότητα αέρα: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (ECMWF / CAMS). Αναζήτηση διευθύνσεων: <a href="https://photon.komoot.io/" target="_blank" rel="noopener">Photon</a> και <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener">Nominatim</a>, με δεδομένα <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>. Συντεταγμένες αεροδρομίων: δημόσια στοιχεία HCAA/Wikipedia.</p>
     </footer>
   </div>
 </div>

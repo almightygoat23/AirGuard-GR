@@ -3,7 +3,7 @@
  * Τα δεδομένα καιρού/ποιότητας αέρα ΔΕΝ αποθηκεύονται ποτέ: πάντα από το δίκτυο.
  * Αν αλλάξεις αρχεία, ανέβασε το CACHE σε νέα έκδοση (v2, v3, ...).
  */
-var CACHE = "airguard-v1";
+var CACHE = "airguard-v2";
 var SHELL = [
   "./", "./index.html", "./core.js", "./airports.js", "./app.js",
   "./manifest.json", "./icon-192.png", "./icon-512.png"
@@ -26,6 +26,8 @@ self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
   // τα API περνούν πάντα από το δίκτυο
   if (url.hostname.indexOf("open-meteo.com") !== -1) return;
+  if (url.hostname.indexOf("komoot.io") !== -1) return;
+  if (url.hostname.indexOf("openstreetmap.org") !== -1) return;
   if (url.origin !== self.location.origin) return;
 
   e.respondWith(

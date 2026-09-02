@@ -8,7 +8,12 @@
   var STORE_KEY = "airguard.v1";
   var FORECAST = "https://api.open-meteo.com/v1/forecast";
   var AIRQ = "https://air-quality-api.open-meteo.com/v1/air-quality";
-  var GEO = "https://geocoding-api.open-meteo.com/v1/search";
+  var GEO = "https://geocoding-api.open-meteo.com/v1/search";     // οικισμοί
+  var PHOTON = "https://photon.komoot.io/api";                    // οδοί, autocomplete
+  var NOMINATIM = "https://nominatim.openstreetmap.org/search";   // οδοί, ακριβής
+  var GR_BBOX = "19.3,34.7,29.8,41.9";
+  var lastNominatim = 0;      // η πολιτική του Nominatim θέλει <=1 αίτημα/δευτερόλεπτο
+  var searchSeq = 0;          // αγνοεί απαντήσεις παλιότερων πληκτρολογήσεων
 
   var state = {
     home: null,          // {lat, lon, label}
@@ -529,47 +534,155 @@
     return { lat: lat, lon: lon };
   }
 
-  function doSearch() {
-    var q = $("q").value.trim();
-    $("results").innerHTML = "";
+  /* Κανονικοποίηση αποτελεσμάτων από τους τρεις geocoders σε κοινή μορφή:
+     {lat, lon, label, sub, kind, source} */
+
+  function fromPhoton(d) {
+    return ((d && d.features) || []).filter(function (f) {
+      return f.properties && f.properties.countrycode === "GR" && f.geometry;
+    }).map(function (f) {
+      var p = f.properties;
+      var street = p.street || (p.osm_key === "highway" ? p.name : null);
+      var label = street
+        ? street + (p.housenumber ? " " + p.housenumber : "")
+        : (p.name || "");
+      var area = [p.district, p.city || p.town || p.village || p.locality, p.county]
+        .filter(Boolean);
+      // χωρίς διπλότυπα στην περιγραφή
+      area = area.filter(function (x, i) { return area.indexOf(x) === i && x !== label; });
+      return {
+        lat: f.geometry.coordinates[1],
+        lon: f.geometry.coordinates[0],
+        label: label,
+        sub: area.join(", "),
+        kind: p.housenumber ? "διεύθυνση" : p.osm_key === "highway" ? "οδός" : "περιοχή",
+        source: "photon"
+      };
+    }).filter(function (r) { return r.label; });
+  }
+
+  function fromNominatim(list) {
+    return (list || []).map(function (r) {
+      var a = r.address || {};
+      var street = a.road || a.pedestrian || a.residential;
+      var label = street
+        ? street + (a.house_number ? " " + a.house_number : "")
+        : (r.name || (r.display_name || "").split(",")[0]);
+      var area = [a.suburb || a.village || a.town || a.city, a.county].filter(Boolean);
+      area = area.filter(function (x) { return x !== label; });
+      return {
+        lat: parseFloat(r.lat), lon: parseFloat(r.lon),
+        label: label, sub: area.join(", "),
+        kind: a.house_number ? "διεύθυνση" : street ? "οδός" : "περιοχή",
+        source: "nominatim"
+      };
+    }).filter(function (r) { return r.label && !isNaN(r.lat); });
+  }
+
+  function fromOpenMeteo(d) {
+    return ((d && d.results) || []).filter(function (r) { return r.country_code === "GR"; })
+      .map(function (r) {
+        return {
+          lat: r.latitude, lon: r.longitude, label: r.name,
+          sub: [r.admin2, r.admin1].filter(Boolean).join(", "),
+          kind: "περιοχή", source: "open-meteo"
+        };
+      });
+  }
+
+  /** Ενώνει λίστες, κρατά τις οδούς/διευθύνσεις πρώτες, πετάει τα διπλά. */
+  function mergeResults(lists) {
+    var rank = { "διεύθυνση": 0, "οδός": 1, "περιοχή": 2 };
+    var seen = {}, out = [];
+    lists.forEach(function (list) {
+      list.forEach(function (r) {
+        var k = r.label + "|" + r.lat.toFixed(3) + "," + r.lon.toFixed(3);
+        if (seen[k]) return;
+        seen[k] = 1;
+        out.push(r);
+      });
+    });
+    return out.sort(function (a, b) { return rank[a.kind] - rank[b.kind]; }).slice(0, 12);
+  }
+
+  function bias() {
+    var h = state.home;
+    return h ? "&lat=" + h.lat.toFixed(3) + "&lon=" + h.lon.toFixed(3) : "&lat=38.0&lon=23.7";
+  }
+
+  /** Photon: γρήγορο, φτιαγμένο για autocomplete. */
+  function searchPhoton(q) {
+    return getJSON(PHOTON + "?q=" + encodeURIComponent(q) + "&limit=12&bbox=" + GR_BBOX + bias())
+      .then(fromPhoton).catch(function () { return []; });
+  }
+
+  /** Nominatim: μόνο σε ρητή αναζήτηση, με σεβασμό στο όριο 1 αιτήματος/δευτερόλεπτο. */
+  function searchNominatim(q) {
+    var wait = Math.max(0, 1100 - (Date.now() - lastNominatim));
+    return new Promise(function (resolve) { setTimeout(resolve, wait); }).then(function () {
+      lastNominatim = Date.now();
+      return getJSON(NOMINATIM + "?format=jsonv2&countrycodes=gr&addressdetails=1&limit=12&q=" +
+                     encodeURIComponent(q));
+    }).then(fromNominatim).catch(function () { return []; });
+  }
+
+  function searchPlaces(q) {
+    return getJSON(GEO + "?name=" + encodeURIComponent(q) + "&count=10&language=el&format=json")
+      .then(fromOpenMeteo).catch(function () { return []; });
+  }
+
+  function renderResults(list, q) {
+    var ul = $("results");
+    ul.innerHTML = "";
+    if (!list.length) {
+      $("searchMsg").innerHTML = "Δεν βρέθηκε τίποτα για «" + q + "». Δοκίμασε οδό μαζί με περιοχή " +
+        "(π.χ. «Μπέκα Σπάτα»), μόνο την περιοχή, ή συντεταγμένες από τους Χάρτες Google " +
+        "(παρατεταμένο πάτημα στο σπίτι σου → αντιγραφή των αριθμών).";
+      return;
+    }
     $("searchMsg").textContent = "";
-    if (!q) return;
+    list.forEach(function (r) {
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.innerHTML = "<span>" + r.label + ' <span class="tag">' + r.kind + "</span></span><small>" +
+        (r.sub ? r.sub + " · " : "") + r.lat.toFixed(4) + ", " + r.lon.toFixed(4) + "</small>";
+      b.addEventListener("click", function () {
+        setHome({
+          lat: r.lat, lon: r.lon,
+          label: r.label + (r.sub ? ", " + r.sub.split(",")[0] : "")
+        });
+        if (r.kind === "οδός") {
+          // το σημείο μιας ολόκληρης οδού είναι το μέσο της· σε μακριές οδούς μετράει
+          $("streetHint").classList.remove("hidden");
+        }
+      });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  /** full=true: ρητή αναζήτηση, ρωτά και τους δύο geocoders. */
+  function doSearch(full) {
+    var q = $("q").value.trim();
+    if (!q) { $("results").innerHTML = ""; $("searchMsg").textContent = ""; return; }
 
     var coords = parseCoords(q);
     if (coords) {
       setHome({ lat: coords.lat, lon: coords.lon, label: coords.lat.toFixed(4) + ", " + coords.lon.toFixed(4) });
       return;
     }
+    if (q.length < 3) return;
 
+    var seq = ++searchSeq;
     $("searchMsg").textContent = "Αναζήτηση…";
-    getJSON(GEO + "?name=" + encodeURIComponent(q) + "&count=10&language=el&format=json")
-      .then(function (d) {
-        var list = (d.results || []).filter(function (r) { return r.country_code === "GR"; });
-        $("searchMsg").textContent = "";
-        if (!list.length) {
-          $("searchMsg").textContent = "Δεν βρέθηκε τοποθεσία στην Ελλάδα με αυτό το όνομα. Δοκιμάστε συντεταγμένες, π.χ. 38.061, 23.594";
-          return;
-        }
-        list.forEach(function (r) {
-          var li = document.createElement("li");
-          var b = document.createElement("button");
-          b.type = "button";
-          b.innerHTML = "<span>" + r.name + "</span><small>" +
-            [r.admin2, r.admin1].filter(Boolean).join(", ") +
-            " · " + r.latitude.toFixed(3) + ", " + r.longitude.toFixed(3) + "</small>";
-          b.addEventListener("click", function () {
-            setHome({
-              lat: r.latitude, lon: r.longitude,
-              label: r.name + (r.admin1 ? ", " + r.admin1 : "")
-            });
-          });
-          li.appendChild(b);
-          $("results").appendChild(li);
-        });
-      })
-      .catch(function () {
-        $("searchMsg").textContent = "Η αναζήτηση απέτυχε. Ελέγξτε τη σύνδεση ή δώστε συντεταγμένες.";
-      });
+    var jobs = full ? [searchPhoton(q), searchNominatim(q), searchPlaces(q)] : [searchPhoton(q)];
+    Promise.all(jobs).then(function (lists) {
+      if (seq !== searchSeq) return;                 // ήρθε νεότερη αναζήτηση
+      var merged = mergeResults(lists);
+      if (!merged.length && !full) return doSearch(true);   // δοκιμή με όλους
+      renderResults(merged, q);
+    });
   }
 
   function useGps() {
@@ -598,11 +711,23 @@
   }
 
   /* ---------- συμβάντα ---------- */
-  $("btnSearch").addEventListener("click", doSearch);
-  $("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); doSearch(); } });
+  $("btnSearch").addEventListener("click", function () { doSearch(true); });
+  $("q").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); doSearch(true); }
+  });
+  var typeTimer = null;
+  $("q").addEventListener("input", function () {
+    clearTimeout(typeTimer);
+    typeTimer = setTimeout(function () { doSearch(false); }, 450);
+  });
   $("btnGps").addEventListener("click", useGps);
   $("btnRefresh").addEventListener("click", refresh);
-  $("btnChange").addEventListener("click", function () { $("q").value = ""; showSetup(); });
+  $("btnChange").addEventListener("click", function () {
+    $("q").value = "";
+    $("results").innerHTML = "";
+    $("streetHint").classList.add("hidden");
+    showSetup();
+  });
   Array.prototype.forEach.call($("radius").children, function (b) {
     b.addEventListener("click", function () {
       state.radiusKm = Number(b.dataset.km);
